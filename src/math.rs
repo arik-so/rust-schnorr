@@ -59,7 +59,7 @@ pub fn is_quadratic_residue(point: &PublicKey) -> bool {
 }
 
 fn legendre_point(point: &PublicKey) -> BigInt {
-    // todo: improve to multiplication of y and z in Jacobian coordinates
+    // TODO: improve to multiplication of y and z in Jacobian coordinates
     let y_component = point_y(&point);
     let y_bigint = BigInt::from_bytes_be(bigint::Sign::Plus, &y_component);
     let legendre = legendre_int(&y_bigint);
