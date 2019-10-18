@@ -24,9 +24,20 @@ pub fn point_from_x(x: &[u8], is_odd: Option<bool>) -> PublicKey {
     return point;
 }
 
+pub fn point_x(point: &PublicKey) -> [u8; 32] {
+    let uncompressed = point.serialize_uncompressed();
+    return uncompressed[1..33].try_into().unwrap();
+}
+
+fn point_y(point: &PublicKey) -> [u8; 32] {
+    let uncompressed = point.serialize_uncompressed();
+    return uncompressed[33..].try_into().unwrap();
+}
+
 mod tests {
-    use num::{BigInt, Num};
+    use num::{BigInt, Num, bigint::Sign};
     use std::str::FromStr;
+    use secp256k1::PublicKey;
 
     #[test]
     fn test_point_from_x() {
@@ -37,5 +48,35 @@ mod tests {
         let even_point = super::point_from_x(&x_bytes, Some(false));
         assert_eq!(odd_point.to_string(), "0302db04732d5f1270f9e084710124b82bc5d921bcf721be8061f39c747f98702f");
         assert_eq!(even_point.to_string(), "0202db04732d5f1270f9e084710124b82bc5d921bcf721be8061f39c747f98702f");
+    }
+
+    #[test]
+    fn test_point_x() {
+        let odd_point = PublicKey::from_str("0302db04732d5f1270f9e084710124b82bc5d921bcf721be8061f39c747f98702f").unwrap();
+        let even_point = PublicKey::from_str("0202db04732d5f1270f9e084710124b82bc5d921bcf721be8061f39c747f98702f").unwrap();
+        let odd_x = super::point_x(&odd_point);
+        let even_x = super::point_x(&even_point);
+        assert_eq!(odd_x, even_x);
+
+        let x_int = BigInt::from_bytes_be(Sign::Plus, &odd_x);
+        let x_hex = &x_int.to_str_radix(16);
+        assert_eq!(x_hex, "2db04732d5f1270f9e084710124b82bc5d921bcf721be8061f39c747f98702f");
+    }
+
+    #[test]
+    fn test_point_y() {
+        let odd_point = PublicKey::from_str("0302db04732d5f1270f9e084710124b82bc5d921bcf721be8061f39c747f98702f").unwrap();
+        let even_point = PublicKey::from_str("0202db04732d5f1270f9e084710124b82bc5d921bcf721be8061f39c747f98702f").unwrap();
+        let odd_y = super::point_y(&odd_point);
+        let even_y = super::point_y(&even_point);
+        assert_ne!(odd_y, even_y);
+
+        let odd_y_int = BigInt::from_bytes_be(Sign::Plus, &odd_y);
+        let odd_y_hex = &odd_y_int.to_str_radix(16);
+        assert_eq!(odd_y_hex, "ff4ea781bb318cfeaf09edc81e409335da8ad89711716f5f1f5e6def6815093f");
+
+        let even_y_int = BigInt::from_bytes_be(Sign::Plus, &even_y);
+        let even_y_hex = &even_y_int.to_str_radix(16);
+        assert_eq!(even_y_hex, "b1587e44ce730150f61237e1bf6cca25752768ee8e90a0e0a1920f97eaf2f0");
     }
 }
