@@ -80,6 +80,7 @@ pub fn negate_int(secret: &SecretKey) -> SecretKey {
 	return negative_secret;
 }
 
+#[cfg(test)]
 mod tests {
 	use std::str::FromStr;
 
