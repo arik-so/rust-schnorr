@@ -34,8 +34,13 @@ fn point_y(point: &PublicKey) -> [u8; 32] {
     return uncompressed[33..].try_into().unwrap();
 }
 
+fn legendre_int(value: &BigInt) -> BigInt {
+    let legendre = (&value).modpow(&*LEGENDRE_EXPONENT, &*FIELD_ORDER_P);
+    return legendre;
+}
+
 mod tests {
-    use num::{BigInt, Num, bigint::Sign};
+    use num::{BigInt, Num, bigint::Sign, ToPrimitive};
     use std::str::FromStr;
     use secp256k1::PublicKey;
 
@@ -78,5 +83,17 @@ mod tests {
         let even_y_int = BigInt::from_bytes_be(Sign::Plus, &even_y);
         let even_y_hex = &even_y_int.to_str_radix(16);
         assert_eq!(even_y_hex, "b1587e44ce730150f61237e1bf6cca25752768ee8e90a0e0a1920f97eaf2f0");
+    }
+
+    #[test]
+    fn test_legendre_int() {
+        let residue_hex = "b1587e44ce730150f61237e1bf6cca25752768ee8e90a0e0a1920f97eaf2f0";
+        let non_residue_hex = "ff4ea781bb318cfeaf09edc81e409335da8ad89711716f5f1f5e6def6815093f";
+        let residue_int = BigInt::from_str_radix(&residue_hex, 16).unwrap();
+        let non_residue_int = BigInt::from_str_radix(&non_residue_hex, 16).unwrap();
+        let residue_legendre = super::legendre_int(&residue_int);
+        let non_residue_legendre = super::legendre_int(&non_residue_int);
+        assert_eq!(residue_legendre.to_i8().unwrap_or(-1), 1);
+        assert_eq!(non_residue_legendre.to_i8().unwrap_or(-1), -1);
     }
 }
