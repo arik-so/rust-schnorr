@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::error::Error;
 use std::mem;
 use std::ops::{Div, Sub};
 
@@ -11,7 +12,24 @@ use super::math;
 
 pub struct KeyPair(pub SecretKey, pub PublicKey);
 
-pub struct Signature(pub SecretKey, pub PublicKey);
+pub struct Signature(pub PublicKey, pub SecretKey);
+
+pub fn encode_signature(signature_struct: &Signature) -> Vec<u8> {
+	let Signature(r_point, signature_s) = signature_struct;
+	let mut signature = vec![];
+	signature.extend_from_slice(&super::math::point_x(&r_point));
+	signature.extend_from_slice(&signature_s[..]);
+	return signature;
+}
+
+pub fn decode_signature(signature: &[u8]) -> Result<Signature, Box<dyn Error>> {
+	let r_x = &signature[..32];
+	let signature_s = &signature[32..];
+
+	let r_point = math::quadratic_residue_point_from_x(&r_x)?;
+	let s_secret = SecretKey::from_slice(&signature_s)?;
+	return Ok(Signature(r_point, s_secret));
+}
 
 pub fn generate_quadratically_residual_keypair() -> KeyPair {
 	let mut rng = rand::thread_rng();
@@ -130,5 +148,16 @@ mod tests {
 			let super::KeyPair(_, public_key) = super::generate_quadratically_residual_keypair();
 			assert_eq!(super::math::is_quadratic_residue(&public_key), true);
 		}
+	}
+
+	#[test]
+	fn test_signature_codec() {
+		let r_point = PublicKey::from_str("03fe3084cb1cc9163425bff89b0ecfc2a396a9c96270cc783f3e3d89a4a049b5a1").unwrap();
+		let signature_s = SecretKey::from_str("e5d5ca46ab3fe61af6a001e02a5b979ee2c1f205c94804dd575aa6134de43ab3").unwrap();
+		let signature = super::Signature(r_point, signature_s);
+		let encoded_signature = super::encode_signature(&signature);
+		let restored_signature = super::decode_signature(&encoded_signature).unwrap();
+		assert_eq!(restored_signature.0.to_string(), "03fe3084cb1cc9163425bff89b0ecfc2a396a9c96270cc783f3e3d89a4a049b5a1");
+		assert_eq!(restored_signature.1.to_string(), "e5d5ca46ab3fe61af6a001e02a5b979ee2c1f205c94804dd575aa6134de43ab3");
 	}
 }
