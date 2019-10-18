@@ -1,11 +1,11 @@
 use std::convert::TryInto;
 use std::error::Error;
 use std::mem;
-use std::ops::{Div, Sub};
+use std::ops::Sub;
 
-use num::{BigInt, bigint};
+use num::{BigInt, bigint, Integer};
 use rand::Rng;
-use secp256k1::{All, PublicKey, Secp256k1, SecretKey};
+use secp256k1::{PublicKey, SecretKey};
 use sha2::{Digest, Sha256};
 
 use super::math;
@@ -13,6 +13,35 @@ use super::math;
 pub struct KeyPair(pub SecretKey, pub PublicKey);
 
 pub struct Signature(pub PublicKey, pub SecretKey);
+
+pub fn sign_message_raw(sk: &SecretKey, message: &str, randomness_keypair: &KeyPair) -> SecretKey {
+	let KeyPair(r_secret, r_point) = randomness_keypair;
+	let pk = PublicKey::from_secret_key(&*super::math::CURVE, &sk);
+
+	// calculate the message hash
+	// hash input: r_point || pk || message
+	let message_hash = compute_message_hash(&r_point, &pk, &message, Some("BIPSchnorr"));
+	let mut signature_s = SecretKey::from_slice(&message_hash).unwrap();
+	signature_s.mul_assign(&sk[..]).unwrap();
+	signature_s.add_assign(&r_secret[..]).unwrap();
+
+	return signature_s;
+}
+
+pub fn verify_signature_raw(pk: &PublicKey, message: &str, signature_s: &SecretKey, r_point: &PublicKey, damage: Option<&PublicKey>) -> bool {
+	let message_hash = compute_message_hash(&r_point, &pk, &message, Some("BIPSchnorr"));
+	let mut hash_point = pk.clone();
+	hash_point.mul_assign(&*math::CURVE, &message_hash).unwrap();
+	hash_point = hash_point.combine(&r_point).unwrap();
+
+	let mut s_point = PublicKey::from_secret_key(&*math::CURVE, &signature_s);
+	if damage.is_some() {
+		s_point = s_point.combine(&damage.unwrap()).unwrap();
+	}
+
+	let are_points_equal = hash_point.eq(&s_point);
+	return are_points_equal;
+}
 
 pub fn encode_signature(signature_struct: &Signature) -> Vec<u8> {
 	let Signature(r_point, signature_s) = signature_struct;
@@ -34,10 +63,15 @@ pub fn decode_signature(signature: &[u8]) -> Result<Signature, Box<dyn Error>> {
 pub fn generate_quadratically_residual_keypair() -> KeyPair {
 	let mut rng = rand::thread_rng();
 	let mut sk_bytes = rng.gen::<[u8; 32]>();
-	let mut sk = SecretKey::from_slice(&sk_bytes).unwrap();
+	let sk_int = BigInt::from_bytes_be(bigint::Sign::Plus, &sk_bytes[..]);
 
 	sk_bytes = [0; 32]; // zeroize private key
 	mem::drop(sk_bytes);
+
+	// modulate the integer
+	let sk_int = sk_int.mod_floor(&*math::CURVE_ORDER_N);
+	let (_, sk_bytes) = sk_int.to_bytes_be();
+	let mut sk = SecretKey::from_slice(&sk_bytes).unwrap();
 
 	let mut pk = PublicKey::from_secret_key(&*math::CURVE, &sk);
 	let is_residue = math::is_quadratic_residue(&pk);

@@ -4,7 +4,7 @@ use std::io::ErrorKind;
 use std::ops::{Div, Sub};
 use std::str::FromStr;
 
-use num::{bigint, BigInt, Integer, Num, ToPrimitive};
+use num::{bigint, BigInt, Num, ToPrimitive};
 use secp256k1::{All, PublicKey, Secp256k1, SecretKey};
 
 lazy_static! {
@@ -85,7 +85,6 @@ mod tests {
 	use std::str::FromStr;
 
 	use num::{BigInt, bigint::Sign, Num, ToPrimitive};
-	use rand::prelude::ThreadRng;
 	use rand::Rng;
 	use secp256k1::{PublicKey, SecretKey};
 
@@ -188,7 +187,7 @@ mod tests {
 
 		let mut original = sum.clone();
 		let negative_delta = super::negate_int(&random_delta);
-		original.add_assign(&negative_delta[..]);
+		original.add_assign(&negative_delta[..]).unwrap();
 		assert_eq!(original.to_string(), random_int.to_string());
 	}
 }
