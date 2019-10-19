@@ -7,6 +7,8 @@ use std::str::FromStr;
 use num::{bigint, BigInt, Num, ToPrimitive};
 use secp256k1::{All, PublicKey, Secp256k1, SecretKey};
 
+use crate::crypto;
+
 lazy_static! {
 	pub static ref CURVE: Secp256k1<All> = Secp256k1::new();
 	pub static ref GENERATOR: PublicKey = PublicKey::from_str("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798").unwrap();
@@ -76,7 +78,8 @@ pub fn negate_int(secret: &SecretKey) -> SecretKey {
 	let mut integer = BigInt::from_bytes_be(bigint::Sign::Plus, &secret[..]);
 	integer = (&*CURVE_ORDER_N).sub(&integer);
 	let (_, negative_integer_bytes) = integer.to_bytes_be();
-	let negative_secret = SecretKey::from_slice(negative_integer_bytes.as_slice()).unwrap();
+	let padded_negative_integer = crypto::pad_byte_array(&negative_integer_bytes, None);
+	let negative_secret = SecretKey::from_slice(padded_negative_integer.as_slice()).unwrap();
 	return negative_secret;
 }
 

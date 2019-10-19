@@ -1,6 +1,5 @@
 use std::convert::TryInto;
 use std::error::Error;
-use std::mem;
 use std::ops::Sub;
 
 use num::{BigInt, bigint, Integer};
@@ -8,7 +7,7 @@ use rand::Rng;
 use secp256k1::{PublicKey, SecretKey};
 use sha2::{Digest, Sha256};
 
-use super::math;
+use crate::math;
 
 pub struct KeyPair(pub SecretKey, pub PublicKey);
 
@@ -62,17 +61,16 @@ pub fn decode_signature(signature: &[u8]) -> Result<Signature, Box<dyn Error>> {
 
 pub fn generate_quadratically_residual_keypair() -> KeyPair {
 	let mut rng = rand::thread_rng();
-	let mut sk_bytes = rng.gen::<[u8; 32]>();
+	let sk_bytes = rng.gen::<[u8; 32]>();
 	let sk_int = BigInt::from_bytes_be(bigint::Sign::Plus, &sk_bytes[..]);
-
-	sk_bytes = [0; 32]; // zeroize private key
-	mem::drop(sk_bytes);
 
 	// modulate the integer
 	let sk_int = sk_int.mod_floor(&*math::CURVE_ORDER_N);
 	let (_, sk_bytes) = sk_int.to_bytes_be();
-	let mut sk = SecretKey::from_slice(&sk_bytes).unwrap();
+	let padded_sk_bytes = pad_byte_array(sk_bytes.as_slice(), None);
+	let mut sk = SecretKey::from_slice(padded_sk_bytes.as_slice()).unwrap();
 
+	// calculate the public key
 	let mut pk = PublicKey::from_secret_key(&*math::CURVE, &sk);
 	let is_residue = math::is_quadratic_residue(&pk);
 
@@ -136,11 +134,25 @@ fn compute_tagged_hash(data: &[u8], tag: &str) -> [u8; 32] {
 	return final_hash.try_into().unwrap();
 }
 
+pub fn pad_byte_array(data: &[u8], expected_length: Option<usize>) -> Vec<u8> {
+	let expected_length = expected_length.unwrap_or(32);
+	let given_length = data.len();
+	if given_length == expected_length {
+		return data.to_vec();
+	}
+	let delta = expected_length - given_length;
+	let mut padded_bytes = vec![0u8; delta];
+	padded_bytes.extend_from_slice(&data);
+	return padded_bytes;
+}
+
 #[cfg(test)]
 mod tests {
 	use std::str::FromStr;
 
 	use secp256k1::{PublicKey, SecretKey};
+
+	use crate::crypto::pad_byte_array;
 
 	#[test]
 	fn test_compute_tagged_hash() {
@@ -193,5 +205,14 @@ mod tests {
 		let restored_signature = super::decode_signature(&encoded_signature).unwrap();
 		assert_eq!(restored_signature.0.to_string(), "03fe3084cb1cc9163425bff89b0ecfc2a396a9c96270cc783f3e3d89a4a049b5a1");
 		assert_eq!(restored_signature.1.to_string(), "e5d5ca46ab3fe61af6a001e02a5b979ee2c1f205c94804dd575aa6134de43ab3");
+	}
+
+	#[test]
+	fn test_pad_byte_array() {
+		let byte_array = vec![123, 234];
+		let padded_array = pad_byte_array(&byte_array, Some(6));
+		assert_eq!(padded_array.len(), 6);
+		let array_string = format!("{:?}", &padded_array);
+		assert_eq!(array_string, "[0, 0, 0, 0, 123, 234]");
 	}
 }
