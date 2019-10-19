@@ -17,7 +17,7 @@ lazy_static! {
 	static ref LEGENDRE_EXPONENT: BigInt = (&*FIELD_ORDER_P).sub(1u8).div(2u8);
 }
 
-pub fn quadratic_residue_point_from_x(x: &[u8]) -> Result<PublicKey, Box<dyn Error>> {
+pub(crate) fn quadratic_residue_point_from_x(x: &[u8]) -> Result<PublicKey, Box<dyn Error>> {
 	let odd_point = point_from_x(&x, Some(true))?;
 	let even_point = point_from_x(&x, Some(false))?;
 
@@ -34,7 +34,7 @@ pub fn quadratic_residue_point_from_x(x: &[u8]) -> Result<PublicKey, Box<dyn Err
 	return Ok(odd_point);
 }
 
-pub fn point_from_x(x: &[u8], is_odd: Option<bool>) -> Result<PublicKey, Box<dyn Error>> {
+pub(crate) fn point_from_x(x: &[u8], is_odd: Option<bool>) -> Result<PublicKey, Box<dyn Error>> {
 	let prefix = if is_odd.unwrap_or(true) {
 		3u8
 	} else {
@@ -46,7 +46,7 @@ pub fn point_from_x(x: &[u8], is_odd: Option<bool>) -> Result<PublicKey, Box<dyn
 	return Ok(point);
 }
 
-pub fn point_x(point: &PublicKey) -> [u8; 32] {
+pub(crate) fn point_x(point: &PublicKey) -> [u8; 32] {
 	let uncompressed = point.serialize_uncompressed();
 	return uncompressed[1..33].try_into().unwrap();
 }
@@ -56,7 +56,7 @@ fn point_y(point: &PublicKey) -> [u8; 32] {
 	return uncompressed[33..].try_into().unwrap();
 }
 
-pub fn is_quadratic_residue(point: &PublicKey) -> bool {
+pub(crate) fn is_quadratic_residue(point: &PublicKey) -> bool {
 	let jacobi_check = legendre_point(&point);
 	return jacobi_check.to_i8().unwrap_or(-1) == 1;
 }
@@ -74,7 +74,7 @@ fn legendre_int(value: &BigInt) -> BigInt {
 	return legendre;
 }
 
-pub fn negate_int(secret: &SecretKey) -> SecretKey {
+pub(crate) fn negate_int(secret: &SecretKey) -> SecretKey {
 	let mut integer = BigInt::from_bytes_be(bigint::Sign::Plus, &secret[..]);
 	integer = (&*CURVE_ORDER_N).sub(&integer);
 	let (_, negative_integer_bytes) = integer.to_bytes_be();

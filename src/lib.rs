@@ -7,8 +7,9 @@ extern crate sha2;
 
 use secp256k1::{PublicKey, SecretKey};
 
-pub mod crypto;
-pub mod math;
+pub mod adapter;
+mod crypto;
+mod math;
 
 pub fn sign_message(sk: &SecretKey, message: &str) -> Vec<u8> {
 	let randomness_keypair = crypto::calculate_signature_r_keypair(&sk, &message);

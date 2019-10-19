@@ -13,7 +13,7 @@ pub struct KeyPair(pub SecretKey, pub PublicKey);
 
 pub struct Signature(pub PublicKey, pub SecretKey);
 
-pub fn sign_message_raw(sk: &SecretKey, message: &str, randomness_keypair: &KeyPair) -> SecretKey {
+pub(crate) fn sign_message_raw(sk: &SecretKey, message: &str, randomness_keypair: &KeyPair) -> SecretKey {
 	let KeyPair(r_secret, r_point) = randomness_keypair;
 	let pk = PublicKey::from_secret_key(&*super::math::CURVE, &sk);
 
@@ -27,7 +27,7 @@ pub fn sign_message_raw(sk: &SecretKey, message: &str, randomness_keypair: &KeyP
 	return signature_s;
 }
 
-pub fn verify_signature_raw(pk: &PublicKey, message: &str, signature_s: &SecretKey, r_point: &PublicKey, damage: Option<&PublicKey>) -> bool {
+pub(crate) fn verify_signature_raw(pk: &PublicKey, message: &str, signature_s: &SecretKey, r_point: &PublicKey, damage: Option<&PublicKey>) -> bool {
 	let message_hash = compute_message_hash(&r_point, &pk, &message, Some("BIPSchnorr"));
 	let mut hash_point = pk.clone();
 	hash_point.mul_assign(&*math::CURVE, &message_hash).unwrap();
@@ -42,7 +42,7 @@ pub fn verify_signature_raw(pk: &PublicKey, message: &str, signature_s: &SecretK
 	return are_points_equal;
 }
 
-pub fn encode_signature(signature_struct: &Signature) -> Vec<u8> {
+pub(crate) fn encode_signature(signature_struct: &Signature) -> Vec<u8> {
 	let Signature(r_point, signature_s) = signature_struct;
 	let mut signature = vec![];
 	signature.extend_from_slice(&super::math::point_x(&r_point));
@@ -50,7 +50,7 @@ pub fn encode_signature(signature_struct: &Signature) -> Vec<u8> {
 	return signature;
 }
 
-pub fn decode_signature(signature: &[u8]) -> Result<Signature, Box<dyn Error>> {
+pub(crate) fn decode_signature(signature: &[u8]) -> Result<Signature, Box<dyn Error>> {
 	let r_x = &signature[..32];
 	let signature_s = &signature[32..];
 
@@ -59,7 +59,7 @@ pub fn decode_signature(signature: &[u8]) -> Result<Signature, Box<dyn Error>> {
 	return Ok(Signature(r_point, s_secret));
 }
 
-pub fn generate_quadratically_residual_keypair() -> KeyPair {
+pub(crate) fn generate_quadratically_residual_keypair() -> KeyPair {
 	let mut rng = rand::thread_rng();
 	let sk_bytes = rng.gen::<[u8; 32]>();
 	let sk_int = BigInt::from_bytes_be(bigint::Sign::Plus, &sk_bytes[..]);
@@ -82,7 +82,7 @@ pub fn generate_quadratically_residual_keypair() -> KeyPair {
 	return KeyPair(sk, pk);
 }
 
-pub fn calculate_signature_r_keypair(sk: &SecretKey, message: &str) -> KeyPair {
+pub(crate) fn calculate_signature_r_keypair(sk: &SecretKey, message: &str) -> KeyPair {
 	let pk = PublicKey::from_secret_key(&*math::CURVE, &sk);
 
 	// calculate d
@@ -134,7 +134,7 @@ fn compute_tagged_hash(data: &[u8], tag: &str) -> [u8; 32] {
 	return final_hash.try_into().unwrap();
 }
 
-pub fn pad_byte_array(data: &[u8], expected_length: Option<usize>) -> Vec<u8> {
+pub(crate) fn pad_byte_array(data: &[u8], expected_length: Option<usize>) -> Vec<u8> {
 	let expected_length = expected_length.unwrap_or(32);
 	let given_length = data.len();
 	if given_length == expected_length {
