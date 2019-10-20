@@ -6,7 +6,6 @@ Experimental library for Schnorr signatures in Rust.
 
 ```rust
 extern crate rust_schnorr;
-use rust_schnorr;
 
 fn main() {
     let message = "Arik is rolling his own crypto";
