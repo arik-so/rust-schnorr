@@ -67,7 +67,7 @@ pub(crate) fn generate_quadratically_residual_keypair() -> KeyPair {
 	// modulate the integer
 	let sk_int = sk_int.mod_floor(&*math::CURVE_ORDER_N);
 	let (_, sk_bytes) = sk_int.to_bytes_be();
-	let padded_sk_bytes = pad_byte_array(sk_bytes.as_slice(), None);
+	let padded_sk_bytes = normalize_sk_bytes(sk_bytes.as_slice());
 	let mut sk = SecretKey::from_slice(padded_sk_bytes.as_slice()).unwrap();
 
 	// calculate the public key
@@ -95,10 +95,11 @@ pub(crate) fn calculate_signature_r_keypair(sk: &SecretKey, message: &str) -> Ke
 	let mut hash_preimage = vec![];
 	hash_preimage.extend_from_slice(&d.to_signed_bytes_be().as_slice());
 	hash_preimage.extend_from_slice(message.as_bytes());
-	let hash = compute_tagged_hash(&hash_preimage, "BIPSchnorrDerive");
+	let hash = compute_tagged_hash(hash_preimage.as_slice(), "BIPSchnorrDerive");
+	let normalized_hash = normalize_sk_bytes(hash.as_ref());
 
 	// calculate r
-	let mut r_secret = SecretKey::from_slice(&hash).unwrap();
+	let mut r_secret = SecretKey::from_slice(normalized_hash.as_slice()).unwrap();
 	let mut r_point = PublicKey::from_secret_key(&*math::CURVE, &r_secret);
 	if !math::is_quadratic_residue(&r_point) {
 		r_secret = math::negate_int(&r_secret);
@@ -132,6 +133,13 @@ fn compute_tagged_hash(data: &[u8], tag: &str) -> [u8; 32] {
 
 	let final_hash = hasher.result();
 	return final_hash.try_into().unwrap();
+}
+
+pub(crate) fn normalize_sk_bytes(data: &[u8]) -> Vec<u8> {
+	let big_int = BigInt::from_bytes_be(bigint::Sign::Plus, &data);
+	let big_int = big_int.mod_floor(&*math::CURVE_ORDER_N);
+	let (_, bytes) = big_int.to_bytes_be();
+	return pad_byte_array(&bytes, Some(32));
 }
 
 pub(crate) fn pad_byte_array(data: &[u8], expected_length: Option<usize>) -> Vec<u8> {
