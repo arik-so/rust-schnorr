@@ -62,13 +62,10 @@ pub(crate) fn decode_signature(signature: &[u8]) -> Result<Signature, Box<dyn Er
 pub(crate) fn generate_quadratically_residual_keypair() -> KeyPair {
 	let mut rng = rand::thread_rng();
 	let sk_bytes = rng.gen::<[u8; 32]>();
-	let sk_int = BigInt::from_bytes_be(bigint::Sign::Plus, &sk_bytes[..]);
 
 	// modulate the integer
-	let sk_int = sk_int.mod_floor(&*math::CURVE_ORDER_N);
-	let (_, sk_bytes) = sk_int.to_bytes_be();
-	let padded_sk_bytes = normalize_sk_bytes(sk_bytes.as_slice());
-	let mut sk = SecretKey::from_slice(padded_sk_bytes.as_slice()).unwrap();
+	let sk_bytes = normalize_sk_bytes(sk_bytes.as_ref());
+	let mut sk = SecretKey::from_slice(sk_bytes.as_slice()).unwrap();
 
 	// calculate the public key
 	let mut pk = PublicKey::from_secret_key(&*math::CURVE, &sk);
