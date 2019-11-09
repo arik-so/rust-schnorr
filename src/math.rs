@@ -15,6 +15,7 @@ lazy_static! {
 	pub static ref CURVE_ORDER_N: BigInt = BigInt::from_str_radix("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16).unwrap();
 	pub static ref FIELD_ORDER_P: BigInt = BigInt::from_str_radix("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16).unwrap();
 	static ref LEGENDRE_EXPONENT: BigInt = (&*FIELD_ORDER_P).sub(1u8).div(2u8);
+	static ref INVERSION_EXPONENT: BigInt = (&*CURVE_ORDER_N).sub(2u8);
 }
 
 pub(crate) fn quadratic_residue_point_from_x(x: &[u8]) -> Result<PublicKey, Box<dyn Error>> {
@@ -83,6 +84,15 @@ pub(crate) fn negate_int(secret: &SecretKey) -> SecretKey {
 	return negative_secret;
 }
 
+pub(crate) fn scalar_inverse(secret: &SecretKey) -> SecretKey {
+	let mut integer = BigInt::from_bytes_be(bigint::Sign::Plus, &secret[..]);
+	let inverse = (&integer).modpow(&*INVERSION_EXPONENT, &*CURVE_ORDER_N);
+	let (_, inverse_scalar_bytes) = inverse.to_bytes_be();
+	let normalized_inverse = crypto::normalize_sk_bytes(&inverse_scalar_bytes);
+	let inverse_secret = SecretKey::from_slice(normalized_inverse.as_slice()).unwrap();
+	return inverse_secret;
+}
+
 #[cfg(test)]
 mod tests {
 	use std::str::FromStr;
@@ -90,6 +100,7 @@ mod tests {
 	use num::{BigInt, bigint::Sign, Num, ToPrimitive};
 	use rand::Rng;
 	use secp256k1::{PublicKey, SecretKey};
+	use secp256k1::constants::CURVE_ORDER;
 
 	#[test]
 	fn test_point_from_x() {
@@ -192,5 +203,27 @@ mod tests {
 		let negative_delta = super::negate_int(&random_delta);
 		original.add_assign(&negative_delta[..]).unwrap();
 		assert_eq!(original.to_string(), random_int.to_string());
+	}
+
+	#[test]
+	fn test_invert_scalar() {
+		// generate random point
+		let mut rng = rand::thread_rng();
+		let random_bytes = rng.gen::<[u8; 32]>();
+		let random_int = SecretKey::from_slice(&random_bytes).unwrap();
+		let random_point = PublicKey::from_secret_key(&*super::CURVE, &random_int);
+
+		let random_blind = SecretKey::from_slice(&random_bytes).unwrap();
+		let unblind = super::scalar_inverse(&random_blind);
+
+		// assert that random_blind * random_point != random_point
+		// assert that unblind * random_blind * random_point == random_point
+		let mut blinded_point = random_point.clone();
+		blinded_point.mul_assign(&*super::CURVE, &random_blind[..]);
+		assert_ne!(&random_point.to_string(), &blinded_point.to_string());
+
+		let mut unblinded_point = blinded_point.clone();
+		unblinded_point.mul_assign(&*super::CURVE, &unblind[..]);
+		assert_eq!(&random_point.to_string(), &unblinded_point.to_string());
 	}
 }
